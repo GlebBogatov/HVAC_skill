@@ -2,17 +2,18 @@
   "_comment": "Карточка позиции спецификации. По одной на каждую позицию. Поля блока bim переносятся в параметры семейства Revit без правки — см. references/bim.md",
 
   "position": "1",
-  "name": "Труба из сшитого полиэтилена PE-Xa 16x2,0 с барьером EVOH",
+  "name": "Труба из сшитого полиэтилена PE-Xa 20x2,0 с барьером EVOH",
   "article": "VTc.???.??",
   "manufacturer": "VALTEC",
-  "series": "V1620",
+  "series": "<серия по каталогу производителя>",
 
   "unit": "м",
   "qty": 640,
   "reserve_pct": 7,
 
   "connection": "-",
-  "dn": 16,
+  "dn": 20,
+  "d_inner": 16,
   "pn": 10,
   "t_max": 95,
   "kv": null,
@@ -26,9 +27,9 @@
   "checked": "2026-07-21",
 
   "bim": {
-    "model_url": "https://valtec.ru/document/technical/drawing/V1620/Revit.zip",
+    "model_url": "https://valtec.ru/document/technical/drawing/<СЕРИЯ>/Revit.zip",
     "has_family": true,
-    "ADSK_Наименование": "Труба PE-Xa 16x2,0 EVOH",
+    "ADSK_Наименование": "Труба PE-Xa 20x2,0 EVOH",
     "ADSK_Обозначение": "",
     "ADSK_Изготовитель": "VALTEC",
     "ADSK_Единица измерения": "м",
