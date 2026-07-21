@@ -12,7 +12,7 @@
 а не по одной паре — неравномерное масштабирование листа встречается часто.
 
 ```bash
-python3 scripts/sheet_pdf.py --ar Лебедь.pdf --page 5 \
+python3 scripts/sheet_pdf.py --ar AR.pdf --page 5 \
         --calib calib.json --layer ov_cokol.json --out ОВ-05.pdf
 ```
 
@@ -55,10 +55,10 @@ python3 scripts/sheet_pdf.py --ar Лебедь.pdf --page 5 \
     "rows": [["К1", "Кладовая", "6,82", "200", "50,2"]]
   },
   "stamp": {
-    "object": "Спортзал, г. Кинель",
+    "object": "{наименование объекта}",
     "sheet_name": "Цоколь. План напольного отопления",
-    "code": "2026-014-ОВ", "sheet_no": "5", "sheets": "14",
-    "designer": "Богатов Г.", "date": "21.07.2026"
+    "code": "{шифр}-ОВ", "sheet_no": "5", "sheets": "14",
+    "designer": "{исполнитель}", "date": "{дата}"
   }
 }
 ```

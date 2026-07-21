@@ -1,5 +1,5 @@
 {
-  "project": "Спортзал, г. Кинель, мкр. Лебедь",
+  "project": "Пример: одноэтажное здание с отапливаемым цоколем",
   "climate": {"t_out": -27.0, "t_ot": -4.7, "z_ot": 196},
   "building_group": 2,
 
@@ -16,7 +16,7 @@
 
   "rooms": [
     {
-      "name": "Спортзал", "area": 58.23, "height": 3.07, "t_in": 18,
+      "name": "Зал", "area": 58.23, "height": 3.07, "t_in": 18,
       "envelopes": [
         {"constr": "НС-1", "area": 78.05, "contact": "outdoor", "beta": 1.10},
         {"constr": "ОК-В", "area": 31.15, "contact": "outdoor", "beta": 1.10},
