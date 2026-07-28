@@ -219,8 +219,25 @@ def fit_text(c, font, text, max_w, size, min_size=4.0):
     return text, s
 
 
+def draw_frame(c, page_w, page_h, left=20.0, other=5.0):
+    """
+    Рамка листа по ГОСТ Р 21.101-2020 / ГОСТ 2.301-68: сплошная основная линия
+    с полем 20 мм слева (подшивка) и по 5 мм сверху, справа, снизу.
+    Нужна для самостоятельных листов; при наложении на подложку АР рамка обычно
+    уже есть — тогда эту функцию не вызывать (флаг --frame выключен по умолчанию).
+    """
+    x = left * MM
+    y = other * MM
+    w = page_w - (left + other) * MM
+    h = page_h - 2 * other * MM
+    c.setStrokeColorRGB(0, 0, 0)
+    c.setLineWidth(1.0)                       # сплошная толстая основная, ГОСТ 2.303
+    c.rect(x, y, w, h, stroke=1, fill=0)
+
+
 def draw_stamp(c, stamp, page_w, page_h, font):
-    """Основная надпись 185×55 мм в правом нижнем углу (ГОСТ Р 21.101)."""
+    """Основная надпись, форма 3, 185×55 мм в правом нижнем углу
+    (ГОСТ Р 21.101-2020). Примыкает к внутренней рамке листа."""
     w, h = 185 * MM, 55 * MM
     m = 5 * MM
     x, y = page_w - w - m, m
@@ -316,6 +333,10 @@ def main():
                     metavar=("X", "Y"), help="положение ведомости, мм")
     ap.add_argument("--legend-at", nargs=2, type=float, default=[15.0, 120.0],
                     metavar=("X", "Y"), help="положение легенды, мм")
+    ap.add_argument("--frame", action="store_true",
+                    help="нарисовать рамку по ГОСТ (поле 20 мм слева, 5 мм с трёх "
+                         "сторон) — для самостоятельных листов; на подложке АР рамка "
+                         "обычно уже есть, тогда флаг не нужен")
     args = ap.parse_args()
 
     from reportlab.pdfgen import canvas as rl_canvas
@@ -361,6 +382,9 @@ def main():
         c.setFillColorRGB(0, 0, 0)          # обязательный сброс
 
     draw_layer(c, tr, data, font)
+
+    if args.frame:
+        draw_frame(c, pw, ph)
 
     if data.get("table"):
         draw_table(c, data["table"], args.table_at[0], args.table_at[1], font)
