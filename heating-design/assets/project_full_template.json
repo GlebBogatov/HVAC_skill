@@ -1,0 +1,297 @@
+{
+  "_comment": "Единый проектный файл. Один источник данных для heatloss/hydro/isometry. Прогон: project.py project.json --run. Формат — references/proekt-fajl.md.",
+  "meta": {
+    "object": "Пример: одноэтажное здание с отапливаемым цоколем",
+    "code": "2025-014",
+    "stage": "Р",
+    "designer": "",
+    "date": ""
+  },
+  "climate": {
+    "t_out": -27.0,
+    "t_ot": -4.7,
+    "z_ot": 196
+  },
+  "building_group": 2,
+  "constructions": {
+    "НС-1": {
+      "kind": "wall",
+      "layers": [
+        [
+          0.19,
+          0.47
+        ],
+        [
+          0.1,
+          0.042
+        ]
+      ],
+      "R_se": 0.115,
+      "note": "КББ 190 + минвата 100, вентфасад"
+    },
+    "НС-2": {
+      "kind": "wall",
+      "R": 2.8,
+      "note": "штукатурка 15 + минвата 100 + ФБС 500"
+    },
+    "ЧП": {
+      "kind": "roof",
+      "layers": [
+        [
+          0.02,
+          0.18
+        ],
+        [
+          0.25,
+          0.041
+        ],
+        [
+          0.02,
+          0.18
+        ]
+      ],
+      "r": 0.88,
+      "R_se": 0.115,
+      "note": "чердачное перекрытие"
+    },
+    "ОК-В": {
+      "kind": "window",
+      "R": 0.7,
+      "note": "витражи, 2-камерный энергосберегающий"
+    },
+    "ОК-Ц": {
+      "kind": "window",
+      "R": 0.55,
+      "note": "окна цоколя"
+    },
+    "ДН": {
+      "kind": "window",
+      "R": 0.6,
+      "note": "дверь наружная стальная утеплённая"
+    }
+  },
+  "rooms": [
+    {
+      "name": "Зал",
+      "area": 58.23,
+      "height": 3.07,
+      "t_in": 18,
+      "envelopes": [
+        {
+          "constr": "НС-1",
+          "area": 78.05,
+          "contact": "outdoor",
+          "beta": 1.1
+        },
+        {
+          "constr": "ОК-В",
+          "area": 31.15,
+          "contact": "outdoor",
+          "beta": 1.1
+        },
+        {
+          "constr": "ЧП",
+          "area": 58.23,
+          "contact": "attic",
+          "n": 0.9
+        }
+      ],
+      "vent": {
+        "mode": "flow",
+        "value": 186
+      },
+      "gains": 0
+    },
+    {
+      "name": "Кладовая",
+      "area": 18.37,
+      "height": 2.27,
+      "t_in": 16,
+      "envelopes": [
+        {
+          "constr": "НС-2",
+          "area": 7.6,
+          "contact": "outdoor",
+          "beta": 1.1
+        },
+        {
+          "constr": "ОК-Ц",
+          "area": 0.65,
+          "contact": "outdoor",
+          "beta": 1.1
+        },
+        {
+          "constr": "ДН",
+          "area": 1.85,
+          "contact": "outdoor",
+          "beta": 1.1,
+          "door_infiltration": {
+            "H": 7.9,
+            "k": 0.22
+          }
+        }
+      ],
+      "ground": {
+        "perimeter": 17.6,
+        "wall_depth": 1.27,
+        "floor_area": 18.37,
+        "R_add_wall": 2.5,
+        "R_add_floor": 1.727
+      },
+      "vent": {
+        "mode": "ach",
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Котельная",
+      "area": 6.27,
+      "height": 2.41,
+      "t_in": 16,
+      "envelopes": [
+        {
+          "constr": "НС-2",
+          "area": 3.1,
+          "contact": "outdoor",
+          "beta": 1.1
+        },
+        {
+          "constr": "ОК-Ц",
+          "area": 0.55,
+          "contact": "outdoor",
+          "beta": 1.1
+        }
+      ],
+      "ground": {
+        "perimeter": 10.2,
+        "wall_depth": 1.27,
+        "floor_area": 6.27,
+        "R_add_wall": 2.5,
+        "R_add_floor": 1.727
+      },
+      "vent": {
+        "mode": "ach",
+        "value": 3.0
+      },
+      "gains": 350
+    }
+  ],
+  "tp": {
+    "collectors": [
+      {
+        "name": "НСУ-1 коллектор цоколя, график 41/36",
+        "t_mean": 38.5,
+        "d_loop_mm": 12.0,
+        "dt": 5.0,
+        "kvs_flowmeter": 2.0,
+        "kvs_manifold": 12.0,
+        "kvs_valve": 4.0,
+        "fitting": {
+          "d_mm": 20.0,
+          "zeta": 10.0
+        },
+        "loops": [
+          {
+            "name": "К1",
+            "room": "Кладовая",
+            "length_m": 50.2,
+            "share": 0.5
+          },
+          {
+            "name": "К2",
+            "room": "Кладовая",
+            "length_m": 44.8,
+            "share": 0.5
+          },
+          {
+            "name": "К6",
+            "room": "Котельная",
+            "length_m": 14.0
+          }
+        ]
+      }
+    ]
+  },
+  "schema": {
+    "title": "Схема системы отопления",
+    "sheet": "ОВ-09",
+    "k_depth": 1.0,
+    "nodes": {
+      "kotel": [
+        0,
+        0,
+        200
+      ],
+      "m1": [
+        2000,
+        0,
+        200
+      ],
+      "ksh": [
+        2000,
+        1500,
+        200
+      ],
+      "k1_in": [
+        3400,
+        1500,
+        200
+      ],
+      "kotel_r": [
+        0,
+        0,
+        0
+      ],
+      "ksh_r": [
+        2200,
+        1700,
+        0
+      ]
+    },
+    "pipes": [
+      {
+        "from": "kotel",
+        "to": "m1",
+        "sys": "T1",
+        "dn": 25
+      },
+      {
+        "from": "m1",
+        "to": "ksh",
+        "sys": "T1",
+        "dn": 25
+      },
+      {
+        "from": "ksh",
+        "to": "k1_in",
+        "sys": "T1",
+        "dn": 16,
+        "riser": "КШ-1"
+      },
+      {
+        "from": "kotel_r",
+        "to": "ksh_r",
+        "sys": "T2",
+        "dn": 25
+      }
+    ],
+    "elements": [
+      {
+        "at": "kotel",
+        "type": "boiler",
+        "label": "Котёл"
+      },
+      {
+        "at": "m1",
+        "type": "pump",
+        "label": "Н1"
+      },
+      {
+        "at": "ksh",
+        "type": "collector",
+        "label": "КШ-1 цоколь"
+      }
+    ],
+    "labels": []
+  }
+}
