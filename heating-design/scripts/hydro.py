@@ -82,6 +82,46 @@ def kvs_dp(Q_m3h, kvs):
 
 
 # --------------------------------------------------------------------------- #
+#  Подбор насоса по семейству кривых Q–H
+# --------------------------------------------------------------------------- #
+
+# Кривые Q–H как точки (расход м³/ч, напор м) — сняты с рабочих полей.
+# Как у Valtec: рабочую точку (Q, H) накладывают на семейство и берут наименьший
+# насос, чья кривая проходит выше точки. 25/N и 30/N — одинаковые кривые.
+# Ориентир, перед выпуском сверять с актуальным паспортом производителя.
+PUMP_CATALOG = [
+    ("WILO Star RS 25/2 (=30/2)", [(0, 1.9), (0.5, 1.65), (1.0, 1.35), (1.5, 0.95), (2.0, 0.35)]),
+    ("WILO Star RS 25/4 (=30/4)", [(0, 4.2), (0.5, 3.7), (1.0, 3.2), (1.5, 2.6), (2.0, 1.9), (2.5, 1.1)]),
+    ("WILO Star RS 25/6 (=30/6)", [(0, 5.6), (0.5, 5.1), (1.0, 4.5), (1.5, 3.8), (2.0, 3.0), (2.5, 2.1), (3.0, 1.1)]),
+    ("WILO Star RS 25/7 (=30/7)", [(0, 6.5), (0.5, 6.1), (1.0, 5.5), (1.5, 4.8), (2.0, 4.0), (2.5, 3.1), (3.0, 2.1)]),
+    ("Grundfos UPS 25-40",        [(0, 4.0), (0.5, 3.5), (1.0, 3.0), (1.5, 2.4), (2.0, 1.6), (2.5, 0.7)]),
+    ("Grundfos UPS 25-60",        [(0, 6.0), (0.5, 5.5), (1.0, 4.9), (1.5, 4.1), (2.0, 3.2), (2.5, 2.2), (3.0, 1.0)]),
+]
+
+
+def _curve_H(curve, Q):
+    """Напор кривой при расходе Q (линейная интерполяция); вне диапазона — 0."""
+    if Q <= curve[0][0]:
+        return curve[0][1]
+    if Q >= curve[-1][0]:
+        return 0.0
+    for i in range(len(curve) - 1):
+        q0, h0 = curve[i]
+        q1, h1 = curve[i + 1]
+        if q0 <= Q <= q1:
+            return h0 + (h1 - h0) * (Q - q0) / (q1 - q0)
+    return 0.0
+
+
+def select_pump(Q_m3h, H_m, catalog=None):
+    """Наименьший насос семейства, чья кривая перекрывает точку (Q, H)."""
+    for name, curve in (catalog or PUMP_CATALOG):
+        if _curve_H(curve, Q_m3h) >= H_m:
+            return name, round(_curve_H(curve, Q_m3h), 2)
+    return None, None
+
+
+# --------------------------------------------------------------------------- #
 
 def run_collector(coll):
     t = float(coll["t_mean"])
@@ -151,9 +191,11 @@ def pump_point(coll, res):
     reserve = float(coll.get("reserve", 0.15))
     tot_r = tot * (1.0 + reserve)
     H = tot_r / G
+    pump, pump_H = select_pump(Qm3, H, coll.get("pump_catalog"))
     return {"parts": parts, "total": tot, "total_reserved": tot_r,
             "reserve": reserve, "Q_m3h": Qm3, "H_m": H,
-            "setpoint_m": math.ceil(H * 10) / 10 + 0.3}
+            "setpoint_m": math.ceil(H * 10) / 10 + 0.3,
+            "pump": pump, "pump_H": pump_H}
 
 
 # --------------------------------------------------------------------------- #
@@ -194,6 +236,12 @@ def to_markdown(data):
         a("")
         a("**Насос: Q = %.2f м³/ч, H = %.2f м** (режим Δp-c, уставка ≈ %.1f м)."
           % (pp["Q_m3h"], pp["H_m"], pp["setpoint_m"]))
+        if pp.get("pump"):
+            a("Принят по рабочему полю кривых: **%s** (даёт %.2f м при рабочем расходе)."
+              % (pp["pump"], pp["pump_H"]))
+        else:
+            a("Подходящего насоса в каталоге нет — рабочая точка выше кривых, "
+              "проверить потери или взять более мощную линейку.")
         a("")
     return "\n".join(o)
 
@@ -208,7 +256,7 @@ def to_json(data):
             "index_loop": res["rows"][res["idx"]]["name"],
             "index_dp_kpa": round(res["rows"][res["idx"]]["dp"], 2),
             "pump": {"Q_m3h": round(pp["Q_m3h"], 3), "H_m": round(pp["H_m"], 2),
-                     "setpoint_m": pp["setpoint_m"]},
+                     "setpoint_m": pp["setpoint_m"], "model": pp.get("pump")},
             "loops": [{"name": r["name"], "room": r["room"], "L_m": r["L"],
                        "Q_W": r["Q"], "G_kgh": round(r["G"], 1),
                        "v_ms": round(r["v"], 3), "dp_kpa": round(r["dp"], 2),

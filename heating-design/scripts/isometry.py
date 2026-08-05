@@ -44,7 +44,7 @@ def projector(k, angle_deg=45.0):
 #  Глифы элементов (в плоскости проекции, мм)
 # --------------------------------------------------------------------------- #
 
-def glyph(kind, X, Y, label=""):
+def glyph(kind, X, Y, label="", opts=None):
     """Возвращает список примитивов layer.json для элемента в точке (X, Y)."""
     L = "EQUIPMENT"
     T = "TEXT"
@@ -103,13 +103,61 @@ def glyph(kind, X, Y, label=""):
         line(X + r * 0.4, Y - r * 0.4, X + r, Y)
         text(X + r + 40, Y, label)
 
-    elif kind == "collector":                   # гребёнка
-        w, h = 900, 160
-        rect(X - w / 2, Y - h / 2, X + w / 2, Y + h / 2)
-        for i in range(1, 6):
-            x = X - w / 2 + i * w / 6
-            line(x, Y - h / 2, x, Y - h / 2 - 140)
-        text(X - w / 2, Y + h / 2 + 60, label)
+    elif kind == "collector":                   # коллекторный узел: две гребёнки
+        n = int((opts or {}).get("outlets", 5))
+        w = max(700, 150 * n)
+        gap = 320                               # между подачей и обраткой
+        # подача (верх) с расходомерами — треугольники вниз
+        rect(X - w / 2, Y + gap / 2, X + w / 2, Y + gap / 2 + 90, "red")
+        for i in range(n):
+            x = X - w / 2 + (i + 0.5) * w / n
+            tp = Y + gap / 2
+            prim["polylines"].append({"layer": L, "pts": [
+                [x - 55, tp], [x + 55, tp], [x, tp - 110], [x - 55, tp]],
+                "color": "red", "width": 0.6})
+        # обратка (низ) с вентилями — бабочки
+        rect(X - w / 2, Y - gap / 2 - 90, X + w / 2, Y - gap / 2, "blue")
+        for i in range(n):
+            x = X - w / 2 + (i + 0.5) * w / n
+            bt = Y - gap / 2
+            prim["polylines"].append({"layer": L, "pts": [
+                [x - 45, bt], [x + 45, bt + 90], [x + 45, bt], [x - 45, bt + 90], [x - 45, bt]],
+                "color": "blue", "width": 0.6})
+        text(X - w / 2, Y + gap / 2 + 200, label)
+
+    elif kind == "mixing_unit":                 # НСУ смесительная (3-ход + насос)
+        w, h = 460, 620
+        rect(X - w / 2, Y - h / 2, X + w / 2, Y + h / 2, "green", 0.8)
+        circ(X - w / 4, Y - h / 6, 90)          # насос
+        line(X - w / 4 - 90, Y - h / 6, X - w / 4 + 90, Y - h / 6)
+        # 3-ходовой клапан — треугольник
+        prim["polylines"].append({"layer": L, "pts": [
+            [X + w / 6 - 90, Y + 60], [X + w / 6 + 90, Y + 60], [X + w / 6, Y - 60],
+            [X + w / 6 - 90, Y + 60]], "color": "green", "width": 0.7})
+        line(X + w / 6, Y - 60, X + w / 6, Y - 180)
+        circ(X - w / 4, Y + h / 4, 55, "green")  # термометр
+        circ(X + w / 4, Y + h / 4, 55, "green")
+        text(X - w / 2, Y - h / 2 - 70, label or "НСУ (3-ход.)")
+
+    elif kind == "pump_group":                  # прямая насосная группа (байпас)
+        w, h = 380, 560
+        rect(X - w / 2, Y - h / 2, X + w / 2, Y + h / 2, "green", 0.8)
+        circ(X, Y, 100)                          # насос
+        line(X - 100, Y, X + 100, Y)
+        line(X + 40, Y + 40, X + 100, Y)
+        line(X + 40, Y - 40, X + 100, Y)
+        circ(X - w / 4, Y + h / 4, 55, "green")
+        circ(X + w / 4, Y + h / 4, 55, "green")
+        text(X - w / 2, Y - h / 2 - 70, label or "Насосная группа")
+
+    elif kind == "slope":                       # уклон
+        line(X, Y, X + 260, Y - 60, "black")
+        text(X - 40, Y + 90, label or "i=0,003", h=100)
+
+    elif kind == "boundary":                    # граница проектирования
+        line(X, Y - 150, X, Y + 150, "black")
+        line(X - 40, Y - 150, X + 40, Y - 150, "black")
+        text(X + 80, Y, label or "граница проектирования", h=100)
 
     elif kind == "riser":                       # маркер стояка
         circ(X, Y, 130, "black")
@@ -169,8 +217,10 @@ def build(data):
         if dn:
             mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
             off = 60 if pipe.get("sys", "T1") == "T1" else -180
+            # «2d=DxS» — парная магистраль подача+обратка (как у Valtec), иначе «ØDN»
+            txt = ("2d=%s" % dn) if pipe.get("pair") else ("Ø%s" % dn)
             layer["texts"].append({"layer": "TEXT", "pt": [mx + 40, my + off],
-                                  "text": "Ø%s" % dn, "h": 100, "color": color})
+                                  "text": txt, "h": 100, "color": color})
         # номер стояка
         if pipe.get("riser"):
             layer["texts"].append({"layer": "TEXT", "pt": [a[0] - 260, (a[1] + b[1]) / 2],
@@ -179,7 +229,7 @@ def build(data):
     # элементы
     for el in data.get("elements", []):
         X, Y = nodes[el["at"]]
-        merge(layer, glyph(el.get("type", ""), X, Y, el.get("label", "")))
+        merge(layer, glyph(el.get("type", ""), X, Y, el.get("label", ""), el))
 
     # свободные подписи
     for lb in data.get("labels", []):
