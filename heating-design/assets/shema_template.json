@@ -1,50 +1,33 @@
 {
-  "_comment": "Вход для scripts/isometry.py — аксонометрическая схема отопления. Узлы: [x вдоль фронта, y в глубину, z вверх], мм. Т1 подача, Т2 обратка. Методика и УГО — references/izometriya.md. k_depth=1.0 (изометрия по ГОСТ 2.317).",
-
-  "title": "Схема системы отопления",
-  "sheet": "ОВ-09",
-  "k_depth": 1.0,
-
-  "nodes": {
-    "kotel":   [0, 0, 200],
-    "m1":      [2000, 0, 200],
-    "st_base": [2000, 1500, 200],
-    "st_1":    [2000, 1500, 900],
-    "st_2":    [2000, 1500, 3900],
-    "st_top":  [2000, 1500, 4300],
-    "rad1_in": [3400, 1500, 900],
-    "rad2_in": [3400, 1500, 3900],
-    "kotel_r": [0, 0, 0],
-    "m1_r":    [2200, 0, 0],
-    "stb_r":   [2200, 1700, 0],
-    "st1_r":   [2200, 1700, 700],
-    "st2_r":   [2200, 1700, 3700]
+  "_comment":"Вход для scripts/isometry.py. Парные магистрали (pair:true) рисуются двумя параллельными линиями Т1/Т2 со смещением pair_gap. Узлы [x,y,z] в мм. Методика и элементы — references/izometriya.md.",
+  "title":"Тёплый пол. Аксонометрия","sheet":"ОВ-09","k_depth":1.0,"pair_gap":80,
+  "nodes":{
+    "vvod":[10500,0,0],"nsu":[10500,0,900],"j1":[10500,0,2100],
+    "jm":[6400,0,2100],"st_t":[6400,0,5200],
+    "ksh1":[3000,1500,2100],"ksh2":[3200,1500,5200],
+    "lv1":[1600,1500,2100],"lv2":[1800,1500,5200],
+    "tmark":[10500,0,2100]
   },
-
-  "pipes": [
-    {"from": "kotel",   "to": "m1",      "sys": "T1", "dn": 25},
-    {"from": "m1",      "to": "st_base", "sys": "T1", "dn": 25},
-    {"from": "st_base", "to": "st_top",  "sys": "T1", "dn": 20, "riser": "Ст1"},
-    {"from": "st_1",    "to": "rad1_in", "sys": "T1", "dn": 15},
-    {"from": "st_2",    "to": "rad2_in", "sys": "T1", "dn": 15},
-    {"from": "kotel_r", "to": "m1_r",    "sys": "T2", "dn": 25},
-    {"from": "m1_r",    "to": "stb_r",   "sys": "T2", "dn": 25},
-    {"from": "stb_r",   "to": "st2_r",   "sys": "T2", "dn": 20},
-    {"from": "rad1_in", "to": "st1_r",   "sys": "T2", "dn": 15},
-    {"from": "rad2_in", "to": "st2_r",   "sys": "T2", "dn": 15}
+  "pipes":[
+    {"from":"vvod","to":"nsu","pair":true},
+    {"from":"nsu","to":"j1","pair":true},
+    {"from":"j1","to":"jm","dn":"26x3","pair":true},
+    {"from":"jm","to":"st_t","dn":"26x3","pair":true,"riser":"Ст-1ТП"},
+    {"from":"st_t","to":"ksh2","dn":"20x2","pair":true},
+    {"from":"jm","to":"ksh1","dn":"26x3","pair":true}
   ],
-
-  "elements": [
-    {"at": "kotel",   "type": "boiler",   "label": "Котёл"},
-    {"at": "m1",      "type": "pump",     "label": "Н1"},
-    {"at": "rad1_in", "type": "radiator", "label": "Р-1  1,2 кВт"},
-    {"at": "rad2_in", "type": "radiator", "label": "Р-2  1,0 кВт"},
-    {"at": "st_top",  "type": "airvent",  "label": ""},
-    {"at": "st_base", "type": "drain",    "label": ""}
+  "elements":[
+    {"at":"vvod","type":"boundary","label":"К котлу (граница проектирования)"},
+    {"at":"nsu","type":"mixing_unit","label":"НСУ VT.VAR 20"},
+    {"at":"st_t","type":"airvent","label":""},
+    {"at":"jm","type":"drain","label":""},
+    {"at":"ksh1","type":"collector","label":"КШ-1 №1  (4 вых.)","outlets":4},
+    {"at":"ksh2","type":"collector","label":"КШ-1 №2  (3 вых.)","outlets":3},
+    {"at":"lv1","type":"level","label":"1 эт. +1.700"},
+    {"at":"lv2","type":"level","label":"2 эт. +4.500"}
   ],
-
-  "labels": [
-    {"at": "st_1", "text": "+0.900", "dx": -650, "dy": 0, "h": 90},
-    {"at": "st_2", "text": "+3.900", "dx": -650, "dy": 0, "h": 90}
+  "labels":[
+    {"at":"tmark","text":"Т11/Т21","dx":180,"dy":150,"h":100},
+    {"at":"tmark","text":"под потолком 1 эт.","dx":180,"dy":-30,"h":80}
   ]
 }

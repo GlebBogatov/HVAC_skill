@@ -123,7 +123,7 @@ def glyph(kind, X, Y, label="", opts=None):
             prim["polylines"].append({"layer": L, "pts": [
                 [x - 45, bt], [x + 45, bt + 90], [x + 45, bt], [x - 45, bt + 90], [x - 45, bt]],
                 "color": "blue", "width": 0.6})
-        text(X - w / 2, Y + gap / 2 + 200, label)
+        text(X - w / 2, Y + gap / 2 + 340, label)
 
     elif kind == "mixing_unit":                 # НСУ смесительная (3-ход + насос)
         w, h = 460, 620
@@ -150,9 +150,18 @@ def glyph(kind, X, Y, label="", opts=None):
         circ(X + w / 4, Y + h / 4, 55, "green")
         text(X - w / 2, Y - h / 2 - 70, label or "Насосная группа")
 
-    elif kind == "slope":                       # уклон
-        line(X, Y, X + 260, Y - 60, "black")
-        text(X - 40, Y + 90, label or "i=0,003", h=100)
+    elif kind == "slope":                       # уклон со стрелкой
+        line(X, Y, X + 300, Y - 70, "black")
+        line(X + 300, Y - 70, X + 230, Y - 45, "black")
+        line(X + 300, Y - 70, X + 250, Y - 110, "black")
+        text(X + 20, Y + 70, label or "i=0,003", h=95)
+
+    elif kind == "level":                        # отметка этажа (флажок уровня)
+        line(X, Y, X + 240, Y, "black")
+        line(X + 240, Y, X + 300, Y + 55, "black")
+        line(X + 240, Y, X + 300, Y - 55, "black")
+        line(X + 300, Y + 55, X + 300, Y - 55, "black")
+        text(X, Y + 70, label, h=110)
 
     elif kind == "boundary":                    # граница проектирования
         line(X, Y - 150, X, Y + 150, "black")
@@ -205,26 +214,45 @@ def build(data):
              "polylines": [], "lines": [], "circles": [], "rects": [], "texts": []}
 
     # трубы
+    gap = float(data.get("pair_gap", 70.0))     # смещение подачи/обратки в паре, мм
     for pipe in data.get("pipes", []):
         a = nodes[pipe["from"]]
         b = nodes[pipe["to"]]
-        color = SYS_COLOR.get(pipe.get("sys", "T1"), "black")
-        lay = "HEAT-MAINS-" + pipe.get("sys", "T1")
-        layer["polylines"].append({"layer": lay, "pts": [list(a), list(b)],
-                                   "color": color, "width": 1.0})
-        # диаметр участка (Т1 подпись выше линии, Т2 ниже — чтобы не наложились)
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        ln = math.hypot(dx, dy) or 1.0
+        px, py = -dy / ln, dx / ln            # единичная нормаль к участку
+        ang = math.degrees(math.atan2(dy, dx))
+        if ang > 90 or ang < -90:
+            ang += 180                         # подпись не вверх ногами
+
+        if pipe.get("pair"):
+            # подача (Т1, красная) и обратка (Т2, синяя) — две параллельные линии
+            for sys_, sign in (("T1", +1), ("T2", -1)):
+                oa = [a[0] + px * gap / 2 * sign, a[1] + py * gap / 2 * sign]
+                ob = [b[0] + px * gap / 2 * sign, b[1] + py * gap / 2 * sign]
+                layer["polylines"].append({"layer": "HEAT-MAINS-" + sys_, "pts": [oa, ob],
+                                           "color": SYS_COLOR[sys_], "width": 1.0})
+        else:
+            sys_ = pipe.get("sys", "T1")
+            layer["polylines"].append({"layer": "HEAT-MAINS-" + sys_,
+                                       "pts": [list(a), list(b)],
+                                       "color": SYS_COLOR.get(sys_, "black"), "width": 1.0})
+
+        mcx, mcy = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+        # подпись диаметра вдоль участка, с одной стороны от нормали
         dn = pipe.get("dn")
         if dn:
-            mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
-            off = 60 if pipe.get("sys", "T1") == "T1" else -180
-            # «2d=DxS» — парная магистраль подача+обратка (как у Valtec), иначе «ØDN»
             txt = ("2d=%s" % dn) if pipe.get("pair") else ("Ø%s" % dn)
-            layer["texts"].append({"layer": "TEXT", "pt": [mx + 40, my + off],
-                                  "text": txt, "h": 100, "color": color})
-        # номер стояка
+            layer["texts"].append({"layer": "TEXT",
+                                  "pt": [mcx + px * (gap + 110), mcy + py * (gap + 110)],
+                                  "text": txt, "h": 95, "color": "black",
+                                  "rot": round(ang, 1), "anchor": "middle"})
+        # номер стояка — с противоположной стороны, чтобы не пересечься с диаметром
         if pipe.get("riser"):
-            layer["texts"].append({"layer": "TEXT", "pt": [a[0] - 260, (a[1] + b[1]) / 2],
-                                  "text": pipe["riser"], "h": 120, "color": "black"})
+            layer["texts"].append({"layer": "TEXT",
+                                  "pt": [mcx - px * (gap + 150), mcy - py * (gap + 150)],
+                                  "text": pipe["riser"], "h": 105, "color": "black",
+                                  "rot": round(ang, 1), "anchor": "middle"})
 
     # элементы
     for el in data.get("elements", []):
@@ -258,13 +286,23 @@ def bounds(layer):
     for r in layer["rects"]:
         xs += [r["p1"][0], r["p2"][0]]; ys += [r["p1"][1], r["p2"][1]]
     for t in layer["texts"]:
-        xs.append(t["pt"][0]); ys.append(t["pt"][1])
+        # учесть примерную ширину подписи, чтобы её не обрезало
+        ext = len(str(t["text"])) * t.get("h", 100) * 0.58
+        anchor = t.get("anchor", "start")
+        x = t["pt"][0]
+        if anchor == "start":
+            xs += [x, x + ext]
+        elif anchor == "end":
+            xs += [x - ext, x]
+        else:
+            xs += [x - ext / 2, x + ext / 2]
+        ys += [t["pt"][1] - t.get("h", 100), t["pt"][1] + t.get("h", 100)]
     if not xs:
         return 0, 0, 1000, 1000
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def to_svg(layer, scale=0.05, margin=60):
+def to_svg(layer, scale=0.05, margin=95):
     x0, y0, x1, y1 = bounds(layer)
     W = (x1 - x0) * scale + 2 * margin
     H = (y1 - y0) * scale + 2 * margin
@@ -284,14 +322,18 @@ def to_svg(layer, scale=0.05, margin=60):
 
     for p in layer["polylines"]:
         pts = " ".join("%.1f,%.1f" % (sx(x), sy(y)) for x, y in p["pts"])
-        out.append('<polyline points="%s" fill="none" stroke="%s" stroke-width="%.1f"/>'
-                   % (pts, col(p.get("color", "black")), p.get("width", 1.0) * 1.4))
+        w = p.get("width", 1.0)
+        lw = 2.0 if w >= 1.0 else 1.2          # магистрали толще, арматура тоньше
+        out.append('<polyline points="%s" fill="none" stroke="%s" stroke-width="%.1f" '
+                   'stroke-linejoin="round" stroke-linecap="round"/>'
+                   % (pts, col(p.get("color", "black")), lw))
     for l in layer["lines"]:
-        out.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="%.1f"/>'
+        out.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" '
+                   'stroke-width="1.2" stroke-linecap="round"/>'
                    % (sx(l["p1"][0]), sy(l["p1"][1]), sx(l["p2"][0]), sy(l["p2"][1]),
-                      col(l.get("color", "black")), l.get("width", 0.6) * 1.4))
+                      col(l.get("color", "black"))))
     for c in layer["circles"]:
-        out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="none" stroke="%s" stroke-width="1"/>'
+        out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="none" stroke="%s" stroke-width="1.2"/>'
                    % (sx(c["c"][0]), sy(c["c"][1]), c["r"] * scale, col(c.get("color", "black"))))
     for r in layer["rects"]:
         x = min(sx(r["p1"][0]), sx(r["p2"][0]))
@@ -299,12 +341,22 @@ def to_svg(layer, scale=0.05, margin=60):
         w = abs(r["p2"][0] - r["p1"][0]) * scale
         h = abs(r["p2"][1] - r["p1"][1]) * scale
         out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="none" '
-                   'stroke="%s" stroke-width="1"/>' % (x, y, w, h, col(r.get("color", "black"))))
+                   'stroke="%s" stroke-width="1.4"/>' % (x, y, w, h, col(r.get("color", "black"))))
     for t in layer["texts"]:
-        fs = max(7, t.get("h", 100) * scale)
-        out.append('<text x="%.1f" y="%.1f" font-family="Arial" font-size="%.1f" fill="%s">%s</text>'
-                   % (sx(t["pt"][0]), sy(t["pt"][1]) - 2, fs, col(t.get("color", "black")),
-                      _esc(t["text"])))
+        fs = max(8, t.get("h", 100) * scale)
+        tx, ty = sx(t["pt"][0]), sy(t["pt"][1]) - 2
+        anchor = t.get("anchor", "start")
+        transform = ""
+        if t.get("rot"):
+            transform = ' transform="rotate(%.1f %.1f %.1f)"' % (-float(t["rot"]), tx, ty)
+        # ореол: белая подложка под текстом, затем цветной текст поверх —
+        # два элемента (paint-order в cairosvg ненадёжен)
+        esc = _esc(t["text"])
+        base = ('<text x="%.1f" y="%.1f" font-family="Arial, sans-serif" '
+                'font-size="%.1f" text-anchor="%s"%s') % (tx, ty, fs, anchor, transform)
+        out.append('%s fill="none" stroke="white" stroke-width="%.1f" '
+                   'stroke-linejoin="round">%s</text>' % (base, fs * 0.35, esc))
+        out.append('%s fill="%s">%s</text>' % (base, col(t.get("color", "black")), esc))
     # заголовок
     out.append('<text x="%.0f" y="%.0f" font-family="Arial" font-size="16" fill="#000">%s</text>'
                % (margin, 24, _esc(layer.get("title", ""))))
