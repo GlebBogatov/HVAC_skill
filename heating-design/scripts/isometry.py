@@ -273,7 +273,7 @@ def build(data):
 #  SVG
 # --------------------------------------------------------------------------- #
 
-def bounds(layer):
+def bounds(layer, scale=0.05):
     xs, ys = [], []
     for p in layer["polylines"]:
         for x, y in p["pts"]:
@@ -286,8 +286,10 @@ def bounds(layer):
     for r in layer["rects"]:
         xs += [r["p1"][0], r["p2"][0]]; ys += [r["p1"][1], r["p2"][1]]
     for t in layer["texts"]:
-        # учесть примерную ширину подписи, чтобы её не обрезало
-        ext = len(str(t["text"])) * t.get("h", 100) * 0.58
+        # ширина по фактическому кеглю (минимум 12 экр. → в модельные единицы)
+        fs = max(12.0, t.get("h", 100) * scale)
+        ext = len(str(t["text"])) * fs * 0.58 / scale
+        hh = fs * 1.4 / scale
         anchor = t.get("anchor", "start")
         x = t["pt"][0]
         if anchor == "start":
@@ -296,14 +298,14 @@ def bounds(layer):
             xs += [x - ext, x]
         else:
             xs += [x - ext / 2, x + ext / 2]
-        ys += [t["pt"][1] - t.get("h", 100), t["pt"][1] + t.get("h", 100)]
+        ys += [t["pt"][1] - hh, t["pt"][1] + hh]
     if not xs:
         return 0, 0, 1000, 1000
     return min(xs), min(ys), max(xs), max(ys)
 
 
 def to_svg(layer, scale=0.05, margin=95):
-    x0, y0, x1, y1 = bounds(layer)
+    x0, y0, x1, y1 = bounds(layer, scale)
     W = (x1 - x0) * scale + 2 * margin
     H = (y1 - y0) * scale + 2 * margin
 
@@ -342,24 +344,62 @@ def to_svg(layer, scale=0.05, margin=95):
         h = abs(r["p2"][1] - r["p1"][1]) * scale
         out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="none" '
                    'stroke="%s" stroke-width="1.4"/>' % (x, y, w, h, col(r.get("color", "black"))))
+    # --- подписи: минимум 12, авто-разведение, чтобы текст не наложился на текст ---
+    MIN_FS = 12.0
+
+    def _box(tx, ty, fs, txt, anchor, rot):
+        tw = len(txt) * fs * 0.58        # ширина строки
+        th = fs * 1.25                   # высота строки
+        ar = abs(((rot or 0.0) + 90) % 180 - 90)   # 0=горизонт, 90=вертикаль
+        if ar > 60:                      # почти вертикальный текст
+            w, h = th, tw
+        elif ar > 25:                    # диагональ ~45°
+            w = h = (tw + th) * 0.62
+        else:
+            w, h = tw, th
+        if anchor == "start":
+            x0 = tx
+        elif anchor == "end":
+            x0 = tx - w
+        else:
+            x0 = tx - w / 2
+        return [x0, ty - h, x0 + w, ty]
+
+    def _overlap(a, b):
+        return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
+
+    items = []
+    # заголовок тоже участвует в раскладке (крупный, слева сверху)
+    title = layer.get("title", "")
+    if title:
+        items.append({"tx": margin, "ty": 26, "fs": 18, "txt": title,
+                      "anchor": "start", "rot": 0.0, "color": "black"})
     for t in layer["texts"]:
-        fs = max(8, t.get("h", 100) * scale)
-        tx, ty = sx(t["pt"][0]), sy(t["pt"][1]) - 2
-        anchor = t.get("anchor", "start")
-        transform = ""
-        if t.get("rot"):
-            transform = ' transform="rotate(%.1f %.1f %.1f)"' % (-float(t["rot"]), tx, ty)
-        # ореол: белая подложка под текстом, затем цветной текст поверх —
-        # два элемента (paint-order в cairosvg ненадёжен)
-        esc = _esc(t["text"])
+        fs = max(MIN_FS, t.get("h", 100) * scale)
+        items.append({"tx": sx(t["pt"][0]), "ty": sy(t["pt"][1]) - 2, "fs": fs,
+                      "txt": _esc(t["text"]), "anchor": t.get("anchor", "start"),
+                      "rot": float(t.get("rot", 0.0)), "color": t.get("color", "black")})
+
+    placed = []
+    for it in sorted(items, key=lambda q: (q["ty"], q["tx"])):
+        box = _box(it["tx"], it["ty"], it["fs"], it["txt"], it["anchor"], it["rot"])
+        for _ in range(60):
+            hit = next((p for p in placed if _overlap(box, p)), None)
+            if not hit:
+                break
+            shift = hit[3] - box[1] + it["fs"] * 0.35     # сдвинуть ниже коллизии
+            it["ty"] += shift
+            box = _box(it["tx"], it["ty"], it["fs"], it["txt"], it["anchor"], it["rot"])
+        placed.append(box)
+        tx, ty = it["tx"], it["ty"]
+        transform = (' transform="rotate(%.1f %.1f %.1f)"' % (-it["rot"], tx, ty)
+                     if it["rot"] else "")
         base = ('<text x="%.1f" y="%.1f" font-family="Arial, sans-serif" '
-                'font-size="%.1f" text-anchor="%s"%s') % (tx, ty, fs, anchor, transform)
+                'font-size="%.1f" text-anchor="%s"%s') % (tx, ty, it["fs"], it["anchor"], transform)
         out.append('%s fill="none" stroke="white" stroke-width="%.1f" '
-                   'stroke-linejoin="round">%s</text>' % (base, fs * 0.35, esc))
-        out.append('%s fill="%s">%s</text>' % (base, col(t.get("color", "black")), esc))
-    # заголовок
-    out.append('<text x="%.0f" y="%.0f" font-family="Arial" font-size="16" fill="#000">%s</text>'
-               % (margin, 24, _esc(layer.get("title", ""))))
+                   'stroke-linejoin="round">%s</text>' % (base, it["fs"] * 0.35, it["txt"]))
+        out.append('%s fill="%s">%s</text>' % (base, col(it["color"]), it["txt"]))
+
     out.append("</svg>")
     return "\n".join(out)
 
