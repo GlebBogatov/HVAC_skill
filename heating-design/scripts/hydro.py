@@ -243,6 +243,24 @@ def to_markdown(data):
             a("Подходящего насоса в каталоге нет — рабочая точка выше кривых, "
               "проверить потери или взять более мощную линейку.")
         a("")
+
+        # балансировка: настройка расходомеров по петлям
+        rho, _ = water(res["t"])
+        idp = res["rows"][res["idx"]]["dp"]
+        a("**Балансировка (настройка расходомеров коллектора):**")
+        a("")
+        a("| Петля | Помещение | Расход, л/мин | Δp петли, кПа | Гасить расходомером, кПа |")
+        a("|---|---|---|---|---|")
+        for i, r in enumerate(res["rows"]):
+            lmin = r["G"] / rho / 60.0 * 1000.0
+            excess = idp - r["dp"]
+            mark = " (индексная — расходомер открыт)" if i == res["idx"] else ""
+            a("| %s | %s | %.2f | %.2f | %.2f%s |"
+              % (r["name"], r["room"], lmin, r["dp"], max(0.0, excess), mark))
+        a("")
+        a("Индексную петлю оставить открытой, остальные придушить расходомером на "
+          "указанный избыток напора (Δp индексной − Δp петли), выставив её расчётный расход.")
+        a("")
     return "\n".join(o)
 
 
@@ -259,7 +277,9 @@ def to_json(data):
                      "setpoint_m": pp["setpoint_m"], "model": pp.get("pump")},
             "loops": [{"name": r["name"], "room": r["room"], "L_m": r["L"],
                        "Q_W": r["Q"], "G_kgh": round(r["G"], 1),
+                       "flow_lmin": round(r["G"] / water(res["t"])[0] / 60.0 * 1000.0, 2),
                        "v_ms": round(r["v"], 3), "dp_kpa": round(r["dp"], 2),
+                       "throttle_kpa": round(max(0.0, res["rows"][res["idx"]]["dp"] - r["dp"]), 2),
                        "note": r["note"]} for r in res["rows"]],
         })
     return out
